@@ -74,18 +74,22 @@ class Jwt implements \Octris\Core\Auth\IStorage
             $cookie = \Octris\Core\Provider::access('cookie');
 
             if (($cookie->isExist('identity') && $cookie->isValid('identity', \Octris\Core\Validate::T_PRINTABLE))) {
-                $jws = SimpleJWS::load($cookie->getValue('identity'));
-                $public_key = openssl_pkey_get_public($this->pem);
+                try {
+                    $jws = SimpleJWS::load($cookie->getValue('identity'));
+                    $public_key = openssl_pkey_get_public($this->pem);
 
-                if ($jws->isValid($public_key, $this->algorithm)) {
-                    $payload = $jws->getPayload();
+                    if ($jws->isValid($public_key, $this->algorithm)) {
+                        $payload = $jws->getPayload();
 
-                    if (!isset($payload['ser'])) {
-                        $this->identity = false;
+                        if (!isset($payload['ser'])) {
+                            $this->identity = false;
+                        } else {
+                            $this->identity = unserialize($payload['ser']);
+                        }
                     } else {
-                        $this->identity = unserialize($payload['ser']);
+                        $this->identity = false;
                     }
-                } else {
+                } catch(\Exception $e) {
                     $this->identity = false;
                 }
             } else {
