@@ -22,13 +22,6 @@ use Namshi\JOSE\SimpleJWS;
 class Jwt implements \Octris\Core\Auth\IStorage
 {
     /**
-     * JWT Algorithm.
-     *
-     * @type    string
-     */
-    protected $algorithm;
-
-    /**
      * File containing private/public key.
      *
      * @type    string
@@ -36,11 +29,15 @@ class Jwt implements \Octris\Core\Auth\IStorage
     protected $pem;
 
     /**
-     * Passphrase for private key.
+     * Options.
      *
-     * @type    string
+     * @type    array
      */
-    protected $passphrase;
+    protected $options = array(
+        'algorithm' => 'RS256',
+        'passphrase' => '',
+        'cookie' => 'identity'
+    );
 
     /**
      * Identity stored in JWT cookie.
@@ -50,17 +47,15 @@ class Jwt implements \Octris\Core\Auth\IStorage
     protected $identity = null;
 
     /**
-     * Constructor.
+     * Constructor. When reading pem from a file the first argument must be prefixed with 'file://'.
      *
-     * @param           string                  $algorithm                  Algorithm to use.
-     * @param           string                  $pem                        Private/public key file.
-     * @param           string                  $passphrase                 Optional passphrase for private key.
+     * @param           string                  $pem                        Private/public key string or file.
+     * @param           array                   $options                    Additional optional options.
      */
-    public function __construct($algorithm, $pem, $passphrase = '')
+    public function __construct($pem, array $options = array())
     {
-        $this->algorithm = $algorithm;
         $this->pem = $pem;
-        $this->passphrase = $passphrase;
+        $this->options = array_merge($this->options, $options);
     }
 
     /**
@@ -71,29 +66,24 @@ class Jwt implements \Octris\Core\Auth\IStorage
     protected function fetchIdentity()
     {
         if (is_null($this->identity)) {
+            $this->identity = false;
             $cookie = \Octris\Core\Provider::access('cookie');
+            $name = $this->options['cookie'];
 
-            if (($cookie->isExist('identity') && $cookie->isValid('identity', \Octris\Core\Validate::T_PRINTABLE))) {
+            if (($cookie->isExist($name) && $cookie->isValid($name, \Octris\Core\Validate::T_PRINTABLE))) {
                 try {
-                    $jws = SimpleJWS::load($cookie->getValue('identity'));
+                    $jws = SimpleJWS::load($cookie->getValue($name));
                     $public_key = openssl_pkey_get_public($this->pem);
 
-                    if ($jws->isValid($public_key, $this->algorithm)) {
+                    if ($jws->isValid($public_key, $this->options['algorithm'])) {
                         $payload = $jws->getPayload();
 
-                        if (!isset($payload['ser'])) {
-                            $this->identity = false;
-                        } else {
+                        if (isset($payload['ser'])) {
                             $this->identity = unserialize($payload['ser']);
                         }
-                    } else {
-                        $this->identity = false;
                     }
                 } catch(\Exception $e) {
-                    $this->identity = false;
                 }
-            } else {
-                $this->identity = false;
             }
         }
 
@@ -118,15 +108,15 @@ class Jwt implements \Octris\Core\Auth\IStorage
     public function setIdentity(\Octris\Core\Auth\Identity $identity)
     {
         $jws  = new SimpleJWS(array(
-            'alg' => $this->algorithm
+            'alg' => $this->options['algorithm']
         ));
         $jws->setPayload(['ser' => serialize($identity)]);
 
-        $private_key = openssl_pkey_get_private($this->pem, $this->passphrase);
+        $private_key = openssl_pkey_get_private($this->pem, $this->options['passphrase']);
 
         $jws->sign($private_key);
 
-        setcookie('identity', $jws->getTokenString());
+        setcookie($this->options['cookie'], $jws->getTokenString());
     }
 
     /**
@@ -144,6 +134,6 @@ class Jwt implements \Octris\Core\Auth\IStorage
      */
     public function unsetIdentity()
     {
-        setcookie('identity', 'deleted', 1);
+        setcookie($this->options['cookie'], 'deleted', 1);
     }
 }
