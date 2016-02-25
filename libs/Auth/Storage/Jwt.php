@@ -116,7 +116,7 @@ class Jwt implements \Octris\Core\Auth\IStorage
 
         $jws->sign($private_key);
 
-        setcookie($this->options['cookie'], $jws->getTokenString());
+        setcookie($this->options['cookie'], $jws->getTokenString(), 0, '/');
     }
 
     /**
@@ -134,6 +134,6 @@ class Jwt implements \Octris\Core\Auth\IStorage
      */
     public function unsetIdentity()
     {
-        setcookie($this->options['cookie'], 'deleted', 1);
+        setcookie($this->options['cookie'], 'deleted', 1, '/');
     }
 }
