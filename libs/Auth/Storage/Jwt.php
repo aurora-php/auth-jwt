@@ -134,6 +134,8 @@ class Jwt implements \Octris\Core\Auth\IStorage
      */
     public function unsetIdentity()
     {
+        $this->identity = false;
+
         setcookie($this->options['cookie'], 'deleted', 1, '/');
     }
 }
