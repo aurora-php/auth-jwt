@@ -36,6 +36,7 @@ class Jwt implements \Octris\Core\Auth\IStorage
     protected $options = array(
         'algorithm' => 'RS256',
         'passphrase' => '',
+        'expiration' => null,
         'cookie' => 'identity'
     );
 
@@ -110,7 +111,14 @@ class Jwt implements \Octris\Core\Auth\IStorage
         $jws  = new SimpleJWS(array(
             'alg' => $this->options['algorithm']
         ));
-        $jws->setPayload(['ser' => serialize($identity)]);
+
+        $payload = ['ser' => serialize($identity)];
+
+        if (!is_null($this->options['expires'])) {
+            $payload['exp'] = $this->options['expires'];
+        }
+
+        $jws->setPayload($payload);
 
         $private_key = openssl_pkey_get_private($this->pem, $this->options['passphrase']);
 
